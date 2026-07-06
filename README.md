@@ -1,87 +1,103 @@
-# Beyond Constant Volatility
+# Dynamic Volatility Modeling for European Option Hedging
 
-**An Empirical Study of Dynamic Delta Hedging**
+**Erdős Institute Quantitative Finance Project — Summer 2026**
 
-This project investigates whether time-varying volatility estimates can improve
-the delta hedging of European call options relative to a constant-volatility
-Black-Scholes benchmark.
+**Authors:** Yue Wu and Freda Zhang
 
-## Initial milestone
+## Overview
 
-The repository currently contains:
+This project studies whether time-varying volatility estimates can improve the delta hedging of European call options.
 
-- Black-Scholes prices for European calls and puts
-- Black-Scholes deltas
-- expiration-value handling
-- input validation
-- unit tests for standard identities and boundary cases
+The Black–Scholes model assumes constant volatility, while real market volatility changes over time. We compare a standard fixed-volatility hedge with adaptive approaches that update volatility using recent returns and market signals.
 
-## Repository structure
+## Research Question
+
+> Can dynamic volatility estimates reduce out-of-sample hedging error relative to constant-volatility Black–Scholes delta hedging?
+
+## Methods
+
+We plan to compare:
+
+- fixed historical volatility;
+- rolling Gaussian volatility;
+- signal-based volatility forecasts.
+
+Each volatility estimate is used in the Black–Scholes delta formula to construct and rebalance a stock-and-cash hedging portfolio.
+
+## Evaluation
+
+The strategies will be evaluated using:
+
+- terminal hedging error;
+- mean absolute error;
+- root mean squared error;
+- tail losses;
+- turnover;
+- transaction costs;
+- performance during high-volatility periods.
+
+All experiments will use chronological train/test splits to avoid look-ahead bias.
+
+## Current Status
+
+The repository currently includes:
+
+- European call and put payoff functions;
+- Black–Scholes call and put pricing;
+- Black–Scholes call and put delta calculations;
+- input validation and expiration handling;
+- unit tests.
+
+## Repository Structure
 
 ```text
-beyond-constant-volatility/
+erdos-volatility-hedging-wu-zhang/
 ├── data/
-│   ├── raw/
-│   └── processed/
 ├── notebooks/
 ├── results/
-│   ├── figures/
-│   └── tables/
 ├── src/
 │   └── option_hedging/
 │       └── derivatives/
 │           └── black_scholes.py
 ├── tests/
-│   └── test_black_scholes.py
-├── .gitignore
-├── pyproject.toml
+├── README.md
 ├── requirements.txt
-└── README.md
+└── pyproject.toml
 ```
 
 ## Installation
 
-Create and activate a virtual environment, then run:
-
 ```bash
+git clone https://github.com/qzhang2000/erdos-volatility-hedging-wu-zhang.git
+cd erdos-volatility-hedging-wu-zhang
+
+python -m venv .venv
+source .venv/bin/activate
+
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m pip install -e .
 ```
 
-## Run the tests
+On Windows, activate the environment with:
+
+```bash
+.venv\Scripts\activate
+```
+
+## Run Tests
 
 ```bash
 pytest
 ```
 
-## Example
+## Roadmap
 
-```python
-from option_hedging.derivatives.black_scholes import call_delta, call_price
-
-price = call_price(
-    spot=100.0,
-    strike=100.0,
-    maturity=30 / 365,
-    rate=0.04,
-    volatility=0.20,
-)
-
-delta = call_delta(
-    spot=100.0,
-    strike=100.0,
-    maturity=30 / 365,
-    rate=0.04,
-    volatility=0.20,
-)
-
-print(price, delta)
-```
-
-## Planned next steps
-
-1. Add fixed and rolling volatility models.
-2. Build a discrete-time delta-hedging engine.
-3. Generate repeated historical option episodes.
-4. Add out-of-sample hedging metrics.
-5. Add a signal-informed volatility model.
+- [x] Implement Black–Scholes prices and deltas.
+- [x] Add unit tests.
+- [ ] Add historical market data.
+- [ ] Implement fixed and rolling volatility models.
+- [ ] Build the delta-hedging backtester.
+- [ ] Add transaction costs and hedging metrics.
+- [ ] Implement signal-based volatility forecasting.
+- [ ] Produce final notebooks and project summary.
