@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+
+# Local data and generated results
+data/raw/*
+data/processed/*
+results/figures/*
+results/tables/*
+
+# Preserve empty folders
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!results/figures/.gitkeep
+!results/tables/.gitkeep
