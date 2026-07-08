@@ -1,4 +1,4 @@
-"""Default signal definitions for the conditional return law project."""
+"""Signal definitions selected for volatility forecasting and option hedging."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import math
 from collections.abc import Iterable
 from typing import Any
 
-from finance_project.signals.base import SignalSpec
-from finance_project.signals.transforms import (
+from option_hedging.signals.base import SignalSpec
+from option_hedging.signals.transforms import (
     ensure_panel,
     rolling_max,
     rolling_mean,
@@ -20,8 +20,82 @@ from finance_project.signals.transforms import (
 
 
 def _min_periods(window: int) -> int:
-    return max(5, window // 2)
+    """Require a complete trailing window for an unambiguous signal."""
 
+    return window
+
+
+
+def _absolute_return_signal() -> SignalSpec:
+    output = "abs_return_1d"
+
+    def compute(data: Any, *, asset_col: str, date_col: str) -> Any:
+        frame = ensure_panel(data, {"close"}, asset_col=asset_col, date_col=date_col)
+        frame[output] = simple_return(
+            frame, price_col="close", periods=1, asset_col=asset_col
+        ).abs()
+        return select_output(frame, [output], asset_col=asset_col, date_col=date_col)
+
+    return SignalSpec(
+        name=output,
+        family="shock",
+        description="Absolute one-period return, a proxy for the latest market shock.",
+        required_columns=("close",),
+        output_columns=(output,),
+        lookback=1,
+        tags=("volatility", "short_horizon", "stress"),
+        compute=compute,
+    )
+
+
+def _volatility_ratio_signal(
+    short_window: int,
+    long_window: int,
+    annualization: int = 252,
+) -> SignalSpec:
+    if short_window >= long_window:
+        raise ValueError("short_window must be smaller than long_window.")
+
+    output = f"vol_ratio_{short_window}d_{long_window}d"
+
+    def compute(data: Any, *, asset_col: str, date_col: str) -> Any:
+        frame = ensure_panel(data, {"close"}, asset_col=asset_col, date_col=date_col)
+        returns = simple_return(frame, price_col="close", periods=1, asset_col=asset_col)
+        short_vol = rolling_std(
+            returns,
+            frame,
+            window=short_window,
+            min_periods=_min_periods(short_window),
+            asset_col=asset_col,
+        ) * math.sqrt(annualization)
+        long_vol = rolling_std(
+            returns,
+            frame,
+            window=long_window,
+            min_periods=_min_periods(long_window),
+            asset_col=asset_col,
+        ) * math.sqrt(annualization)
+        frame[output] = short_vol / long_vol.where(long_vol != 0)
+        return select_output(frame, [output], asset_col=asset_col, date_col=date_col)
+
+    return SignalSpec(
+        name=output,
+        family="volatility",
+        description=(
+            f"Ratio of {short_window}-period to {long_window}-period realized "
+            "volatility; values above one indicate an accelerating volatility regime."
+        ),
+        required_columns=("close",),
+        output_columns=(output,),
+        lookback=long_window,
+        tags=("scale", "regime", "stress"),
+        params={
+            "short_window": short_window,
+            "long_window": long_window,
+            "annualization": annualization,
+        },
+        compute=compute,
+    )
 
 def _momentum_signal(window: int) -> SignalSpec:
     output = f"mom_{window}d"
@@ -317,40 +391,26 @@ def passthrough_signal(
     )
 
 
-def make_default_signal_specs() -> list[SignalSpec]:
-    """Return the default nested signal library."""
+def make_hedging_signal_specs() -> list[SignalSpec]:
+    """Return the compact signal set used by the option-hedging project."""
 
-    specs: list[SignalSpec] = [
+    return [
         _reversal_signal(),
-        *[_momentum_signal(window) for window in (5, 21, 63, 126, 252)],
-        *[_realized_vol_signal(window) for window in (21, 63, 126)],
-        *[_downside_vol_signal(window) for window in (21, 63)],
-        *[_drawdown_signal(window) for window in (21, 63, 252)],
-        *[_dollar_volume_signal(window) for window in (21, 63)],
-        *[_amihud_signal(window) for window in (21, 63)],
-        *[_rolling_skew_signal(window) for window in (63, 126)],
-        *[_downside_frequency_signal(window) for window in (21, 63)],
-        _ratio_signal(
-            name="book_to_market",
-            numerator="book_equity",
-            denominator="market_cap",
-            description="Book equity divided by market capitalization.",
-            tags=("valuation", "location", "slow_state"),
-        ),
-        _ratio_signal(
-            name="earnings_yield",
-            numerator="net_income_ttm",
-            denominator="market_cap",
-            description="Trailing twelve-month net income divided by market capitalization.",
-            tags=("valuation", "location", "slow_state"),
-        ),
-        _ratio_signal(
-            name="sales_to_price",
-            numerator="revenue_ttm",
-            denominator="market_cap",
-            description="Trailing twelve-month revenue divided by market capitalization.",
-            tags=("valuation", "location", "slow_state"),
-        ),
+        _absolute_return_signal(),
+        *[_momentum_signal(window) for window in (5, 21)],
+        *[_realized_vol_signal(window) for window in (5, 21, 63)],
+        _volatility_ratio_signal(5, 21),
+        _volatility_ratio_signal(21, 63),
+        _downside_vol_signal(21),
+        *[_drawdown_signal(window) for window in (63, 252)],
+        _dollar_volume_signal(21),
+        _amihud_signal(21),
+        _rolling_skew_signal(63),
+        _downside_frequency_signal(21),
     ]
-    return specs
 
+
+def make_default_signal_specs() -> list[SignalSpec]:
+    """Return the default option-hedging signal library."""
+
+    return make_hedging_signal_specs()

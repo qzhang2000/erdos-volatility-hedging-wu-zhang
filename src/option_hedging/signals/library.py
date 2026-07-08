@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Literal
 
-from finance_project.signals.base import SignalRegistry, SignalSpec
-from finance_project.signals.definitions import make_default_signal_specs
-from finance_project.signals.transforms import ensure_panel
+from option_hedging.signals.base import SignalRegistry, SignalSpec
+from option_hedging.signals.definitions import make_default_signal_specs
+from option_hedging.signals.transforms import ensure_panel
 
 MissingPolicy = Literal["raise", "skip"]
 

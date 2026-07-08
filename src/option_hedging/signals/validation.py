@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from finance_project.signals.transforms import _require_numpy, _require_pandas, ensure_panel
+from option_hedging.signals.transforms import _require_numpy, _require_pandas, ensure_panel
 
 
 def summarize_signal_frame(

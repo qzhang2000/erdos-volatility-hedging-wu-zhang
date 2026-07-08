@@ -1,5 +1,9 @@
-"""Volatility-estimation models."""
+"""Volatility-estimation and forecasting models."""
 
+from .signal_volatility import (
+    RidgeVolatilityForecaster,
+    expanding_window_predictions,
+)
 from .volatility import (
     FixedHistoricalVolatility,
     RollingGaussianVolatility,
@@ -8,6 +12,8 @@ from .volatility import (
 
 __all__ = [
     "FixedHistoricalVolatility",
+    "RidgeVolatilityForecaster",
     "RollingGaussianVolatility",
     "annualized_historical_volatility",
+    "expanding_window_predictions",
 ]

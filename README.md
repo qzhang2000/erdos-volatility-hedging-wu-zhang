@@ -1,159 +1,114 @@
-# Dynamic Volatility and Risk-Aware Option Hedging
+# Dynamic Volatility Modeling for European Option Hedging
 
-**Erdos Institute Quantitative Finance Project - Summer 2026**
+**Erdős Institute Quantitative Finance Project — Summer 2026**
 
 **Authors:** Yue Wu and Freda Zhang
 
-## Overview
+## Project Overview
 
-This project studies whether quantitative researchers can improve European option hedging by using market and macroeconomic signals beyond historical stock prices. The baseline is a constant-volatility Black-Scholes delta hedge. The planned research extension is a risk-aware hedging system that identifies periods of elevated market risk and adjusts volatility estimates, hedge frequency, or hedge aggressiveness before running an out-of-sample backtest.
+This project studies whether time-varying volatility estimates can improve the
+delta hedging of European call options relative to a constant-volatility
+Black–Scholes benchmark.
 
-The project will combine option pricing, volatility forecasting, and risk-management evaluation. Candidate signals include option-implied volatility, trading volume, interest rates, earnings announcement dates, volatility index levels, macroeconomic releases, sector returns, and news or text-based sentiment measures.
+The project compares three volatility inputs:
+
+1. **Fixed historical volatility** — estimated at option initiation and held
+   constant through expiration.
+2. **Rolling Gaussian volatility** — updated from the most recent return window.
+3. **Signal-based volatility** — predicted from market signals using ridge
+   regression on future realized volatility.
+
+Every volatility estimate is inserted into the same Black–Scholes delta-hedging
+engine. Strategies are evaluated chronologically using hedging error,
+transaction costs, turnover, and tail losses.
 
 ## Research Question
 
-> Can a signal-based risk model reduce out-of-sample hedging error and tail losses relative to a constant-volatility Black-Scholes delta hedge?
+> Can dynamic and signal-based volatility estimates reduce out-of-sample
+> hedging error and tail losses relative to constant-volatility Black–Scholes
+> delta hedging?
 
-## Project Scope
+## Implemented Pipeline
 
-The project will compare three hedging approaches:
+The repository now supports the complete computational pipeline:
 
-- **Benchmark hedge:** Black-Scholes delta hedge using fixed historical volatility.
-- **Adaptive volatility hedge:** Black-Scholes delta hedge using rolling historical or Gaussian volatility estimates.
-- **Risk-aware hedge:** Black-Scholes delta hedge using a signal-based volatility or risk-state model that reacts to elevated-risk periods.
+```text
+market prices and volume
+        ↓
+leakage-safe market signals
+        ↓
+future realized-volatility target
+        ↓
+chronological train/test split
+        ↓
+ridge volatility forecast
+        ↓
+fixed / rolling / signal volatility paths
+        ↓
+repeated European call episodes
+        ↓
+Black–Scholes delta hedging
+        ↓
+forecast and hedging metrics
+```
 
-The final strategy must be evaluated only on chronological out-of-sample periods. Features available after each hedge date must not be used for that hedge decision.
+### Available signal groups
 
-## Data Inputs
+- recent return shock and absolute return;
+- 5-day and 21-day momentum;
+- 5-day, 21-day, and 63-day realized volatility;
+- short-to-long volatility ratios;
+- downside volatility;
+- 63-day and 252-day drawdown;
+- downside-return frequency and rolling skewness;
+- rolling dollar volume and Amihud illiquidity.
 
-The minimum viable dataset will include:
-
-- underlying adjusted close prices;
-- daily returns and rolling realized volatility;
-- trading volume and volume shocks;
-- risk-free interest rates or Treasury yields;
-- option-implied volatility or a broad volatility index such as VIX;
-- sector or market index returns.
-
-Optional extensions:
-
-- earnings announcement indicators;
-- macroeconomic release indicators;
-- news or sentiment features;
-- option-chain data for implied volatility smiles or term structure.
-
-Raw data will be stored in `data/raw/`. Cleaned, aligned feature panels will be stored in `data/processed/`.
-
-## Modeling Plan
-
-1. Build a daily feature panel aligned by date.
-2. Construct volatility labels, such as next-period realized volatility or future absolute return.
-3. Train only on past observations using chronological splits.
-4. Compare fixed historical volatility, rolling volatility, and signal-based models.
-5. Convert model output into a hedging input:
-   - predicted volatility for Black-Scholes delta;
-   - high-risk indicator for wider volatility buffers;
-   - high-risk indicator for more frequent or more conservative rebalancing.
-6. Run each strategy through the same delta-hedging backtester.
-7. Report accuracy, hedging error, transaction costs, turnover, and tail-risk metrics.
-
-## Planned Executables
-
-The project will expose concrete command-line modules so the full workflow can be reproduced from a clean checkout.
-
-| Executable | Purpose | Primary output |
-| --- | --- | --- |
-| `python -m option_hedging.cli.fetch_data --config configs/data.yaml` | Download or load raw price, volume, rate, volatility-index, and event data. | `data/raw/*.csv` |
-| `python -m option_hedging.cli.build_features --config configs/features.yaml` | Clean, align, and merge market signals into one modeling panel. | `data/processed/feature_panel.parquet` |
-| `python -m option_hedging.cli.train_risk_model --config configs/model.yaml` | Train volatility and elevated-risk models using chronological splits. | `results/models/risk_model.pkl` and `results/tables/model_metrics.csv` |
-| `python -m option_hedging.cli.run_backtest --config configs/backtest.yaml` | Run baseline, adaptive, and risk-aware hedging strategies. | `results/tables/backtest_metrics.csv` and `results/tables/hedge_paths.csv` |
-| `python -m option_hedging.cli.make_report --config configs/report.yaml` | Generate final tables and figures for presentation. | `results/figures/*.png` and `results/report.md` |
-
-The existing package currently implements reusable library functions. These CLI modules are planned deliverables and will call the package code rather than duplicating analysis logic in notebooks.
-
-## Deliverables
-
-The completed project should produce:
-
-- reproducible Python package under `src/option_hedging/`;
-- tested Black-Scholes pricing and delta functions;
-- tested market-data validation and return calculations;
-- tested fixed and rolling volatility estimators;
-- tested discrete-time delta-hedging backtester with transaction costs;
-- cleaned feature panel at `data/processed/feature_panel.parquet`;
-- trained risk or volatility model artifact at `results/models/risk_model.pkl`;
-- out-of-sample strategy comparison at `results/tables/backtest_metrics.csv`;
-- hedge-path diagnostics at `results/tables/hedge_paths.csv`;
-- figures for volatility forecasts, risk regimes, hedging-error distributions, cumulative hedging error, and transaction costs;
-- final analysis notebook in `notebooks/final_analysis.ipynb`;
-- final written summary in `results/report.md`;
-- project presentation slides or figures suitable for the Erdos Institute final presentation.
-
-## Evaluation Metrics
-
-Strategies will be evaluated with:
-
-- terminal hedging error;
-- mean absolute hedging error;
-- root mean squared hedging error;
-- 95th and 99th percentile absolute error;
-- expected shortfall of hedging losses;
-- total transaction cost;
-- turnover and number of rebalances;
-- performance during high-volatility or elevated-risk periods.
-
-Model quality will be evaluated with:
-
-- realized-volatility prediction error;
-- high-risk classification precision and recall;
-- calibration of predicted risk states;
-- feature importance or coefficient interpretation when available.
-
-## Current Status
-
-The repository currently includes:
-
-- European call and put payoff functions;
-- Black-Scholes call and put pricing;
-- Black-Scholes call and put delta calculations;
-- market-price loading, validation, and return utilities;
-- fixed historical volatility and rolling Gaussian volatility estimators;
-- a discrete-time delta-hedging backtester for short European calls;
-- transaction-cost handling in the hedge simulator;
-- unit tests for pricing, market data, volatility, and hedging modules.
+All signal calculations use information available at or before the feature date.
+The future realized-volatility target is used only as a supervised-learning
+label.
 
 ## Repository Structure
 
-Current and planned structure:
-
 ```text
 erdos-volatility-hedging-wu-zhang/
-├── configs/                         # planned reproducible run configs
 ├── data/
 │   ├── raw/
 │   └── processed/
+├── docs/
+│   └── research_pipeline.md
+├── examples/
+│   └── run_synthetic_pipeline.py
 ├── notebooks/
-│   └── final_analysis.ipynb         # planned final analysis notebook
+│   └── 01_end_to_end_demo.ipynb
 ├── results/
 │   ├── figures/
-│   ├── models/                      # planned model artifacts
-│   ├── tables/
-│   └── report.md                    # planned final report
+│   └── tables/
 ├── src/
 │   └── option_hedging/
-│       ├── cli/                     # planned executable modules
+│       ├── backtesting/
+│       │   └── episodes.py
 │       ├── data/
 │       │   └── market_data.py
 │       ├── derivatives/
 │       │   └── black_scholes.py
+│       ├── evaluation/
+│       │   └── hedging_metrics.py
 │       ├── models/
+│       │   ├── signal_volatility.py
 │       │   └── volatility.py
+│       ├── signals/
+│       │   ├── base.py
+│       │   ├── definitions.py
+│       │   ├── library.py
+│       │   ├── targets.py
+│       │   ├── transforms.py
+│       │   └── validation.py
 │       └── strategies/
 │           └── delta_hedging.py
 ├── tests/
-├── README.md
+├── pyproject.toml
 ├── requirements.txt
-└── pyproject.toml
+└── README.md
 ```
 
 ## Installation
@@ -164,7 +119,6 @@ cd erdos-volatility-hedging-wu-zhang
 
 python -m venv .venv
 source .venv/bin/activate
-
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m pip install -e .
@@ -176,35 +130,75 @@ On Windows, activate the environment with:
 .venv\Scripts\activate
 ```
 
-## Run Tests
+## Run the Tests
 
 ```bash
 pytest
 ```
 
-## Reproducible Workflow
+The completed repository contains tests for:
 
-Once the planned CLI modules are implemented, the full project should run with:
+- Black–Scholes prices, payoffs, and deltas;
+- market-data validation and return calculations;
+- fixed and rolling volatility estimators;
+- signal construction and leakage checks;
+- future realized-volatility alignment;
+- ridge volatility forecasts;
+- discrete-time delta hedging and transaction costs;
+- repeated option episodes and strategy-level metrics.
+
+## Run the End-to-End Demonstration
 
 ```bash
-python -m option_hedging.cli.fetch_data --config configs/data.yaml
-python -m option_hedging.cli.build_features --config configs/features.yaml
-python -m option_hedging.cli.train_risk_model --config configs/model.yaml
-python -m option_hedging.cli.run_backtest --config configs/backtest.yaml
-python -m option_hedging.cli.make_report --config configs/report.yaml
-pytest
+python examples/run_synthetic_pipeline.py
 ```
 
-## Roadmap
+This example generates a reproducible synthetic market, trains the signal model,
+compares three hedging strategies, and writes output tables to `results/tables/`.
+It is a software demonstration, not an empirical project result.
 
-- [x] Implement Black-Scholes prices and deltas.
-- [x] Add unit tests.
-- [x] Add market-data validation and return utilities.
-- [x] Implement fixed and rolling volatility estimators.
-- [x] Build a delta-hedging backtester with transaction costs.
-- [ ] Add raw market, rate, volatility-index, and optional event data.
-- [ ] Implement feature-panel construction.
-- [ ] Implement signal-based volatility or elevated-risk model.
-- [ ] Add risk-aware hedge adjustments.
-- [ ] Add CLI executables for the full workflow.
-- [ ] Generate final tables, figures, notebook, report, and presentation materials.
+The same workflow is also presented in:
+
+```text
+notebooks/01_end_to_end_demo.ipynb
+```
+
+## Fair Strategy Comparison
+
+Within each option episode, all hedging strategies receive the same initial
+option premium. This separates hedging performance from differences in model
+pricing. The premium is calculated using a designated pricing strategy, while
+each hedge may use its own volatility path for delta calculations.
+
+## Evaluation Metrics
+
+Volatility forecasts are evaluated using:
+
+- mean absolute error;
+- root mean squared error;
+- bias;
+- forecast correlation.
+
+Hedging strategies are evaluated using:
+
+- mean terminal hedging error;
+- mean absolute hedging error;
+- root mean squared hedging error;
+- error standard deviation;
+- 95th and 99th percentile absolute error;
+- hedging-loss Value at Risk and Expected Shortfall;
+- transaction costs;
+- share and notional turnover.
+
+## Remaining Empirical Work
+
+The reusable code is complete enough to run the study. The remaining work is to:
+
+1. choose the underlying asset and historical sample period;
+2. obtain and document adjusted-close and volume data;
+3. optionally add point-in-time external variables such as VIX or interest rates;
+4. select training, validation, and test periods;
+5. tune model hyperparameters using only pre-test data;
+6. run robustness checks across option maturities, rebalancing frequencies, and
+   transaction-cost assumptions;
+7. prepare final figures, executive summary, and presentation.
