@@ -1,71 +1,155 @@
 # Dynamic Volatility Modeling for European Option Hedging
 
-**Erdős Institute Quantitative Finance Project — Summer 2026**
+**Erdos Institute Quantitative Finance Project - Summer 2026**
 
 **Authors:** Yue Wu and Freda Zhang
 
 ## Project Overview
 
-This project studies whether time-varying volatility estimates can improve the
-delta hedging of European call options relative to a constant-volatility
-Black–Scholes benchmark.
+This project studies whether dynamic volatility models can improve European
+option delta hedging relative to a constant-volatility Black-Scholes benchmark.
 
-The project compares three volatility inputs:
+The lecture notes motivate three model classes for the project:
 
-1. **Fixed historical volatility** — estimated at option initiation and held
-   constant through expiration.
-2. **Rolling Gaussian volatility** — updated from the most recent return window.
-3. **Signal-based volatility** — predicted from market signals using ridge
-   regression on future realized volatility.
+1. **Constant-volatility Black-Scholes** as the benchmark.
+2. **Markov regime-switching volatility**, including both finite-state
+   discrete-time chains and continuous-time two-state chains.
+3. **Heston stochastic volatility**, where variance is a mean-reverting
+   stochastic process calibrated to option prices.
 
-Every volatility estimate is inserted into the same Black–Scholes delta-hedging
-engine. Strategies are evaluated chronologically using hedging error,
-transaction costs, turnover, and tail losses.
+The project should therefore be framed around Black-Scholes, Markov
+regime-switching, and Heston hedging, rather than generic volatility or
+risk-signal labels.
 
 ## Research Question
 
-> Can dynamic and signal-based volatility estimates reduce out-of-sample
-> hedging error and tail losses relative to constant-volatility Black–Scholes
-> delta hedging?
+> Can Markov regime-switching or Heston stochastic-volatility models reduce
+> chronological out-of-sample hedging error relative to a fixed-volatility
+> Black-Scholes delta hedge?
 
-## Implemented Pipeline
+## Project Scope
 
-The repository now supports the complete computational pipeline:
+The project will compare three hedging approaches under the same data,
+rebalancing, and transaction-cost assumptions.
+
+- **Benchmark hedge:** Black-Scholes delta hedge using one fixed historical
+  volatility estimate.
+- **Markov regime-switching hedge:** delta hedge using low- and high-volatility
+  regimes. The finite-state discrete-time chain supports simulation and regime
+  intuition. The continuous-time two-state chain supports Markov-modulated GBM
+  option pricing, implied-volatility curves, and model deltas.
+- **Heston stochastic-volatility hedge:** delta hedge using Heston prices and
+  deltas from a calibrated mean-reverting variance process.
+
+All final comparisons must be chronological and out of sample. Information
+available after a hedge date, including future returns, later option quotes, or
+future calibration targets, must not be used for that hedge decision.
+
+## Data Inputs
+
+The minimum dataset should include:
+
+- underlying adjusted close prices;
+- daily returns and realized volatility;
+- option-chain records with quote date, expiration, strike, option type, bid,
+  ask, mid price, and implied volatility when available;
+- risk-free interest rates or a documented constant-rate assumption;
+- calendar fields needed to compute time to maturity.
+
+Raw data belongs in `data/raw/`. Cleaned and aligned datasets belong in
+`data/processed/`.
+
+Data cleaning should preserve point-in-time availability. Missing quotes, stale
+quotes, crossed markets, and zero-bid contracts should be filtered before
+calibration or hedging evaluation.
+
+## Model Plan
+
+### Black-Scholes Baseline
+
+Use the standard Black-Scholes price and delta formulas with fixed historical
+volatility. This benchmark isolates the value of moving beyond a single
+constant volatility input.
+
+### Markov Regime-Switching Model
+
+Use a two-state volatility model with low- and high-volatility regimes.
+
+The discrete-time finite-state chain describes transitions over a fixed time
+grid:
 
 ```text
-market prices and volume
-        ↓
-leakage-safe market signals
-        ↓
-future realized-volatility target
-        ↓
-chronological train/test split
-        ↓
-ridge volatility forecast
-        ↓
-fixed / rolling / signal volatility paths
-        ↓
-repeated European call episodes
-        ↓
-Black–Scholes delta hedging
-        ↓
-forecast and hedging metrics
+P = [[p_LL, p_LH],
+     [p_HL, p_HH]]
 ```
 
-### Available signal groups
+The continuous-time two-state chain uses transition rates and generator:
 
-- recent return shock and absolute return;
-- 5-day and 21-day momentum;
-- 5-day, 21-day, and 63-day realized volatility;
-- short-to-long volatility ratios;
-- downside volatility;
-- 63-day and 252-day drawdown;
-- downside-return frequency and rolling skewness;
-- rolling dollar volume and Amihud illiquidity.
+```text
+Q = [[-alpha, alpha],
+     [ beta, -beta]]
+```
 
-All signal calculations use information available at or before the feature date.
-The future realized-volatility target is used only as a supervised-learning
-label.
+Under Markov-modulated GBM, the stock follows Black-Scholes dynamics locally,
+but the volatility changes with the Markov state. Option prices can be computed
+by averaging Black-Scholes prices over the occupation-time distribution of the
+high-volatility state. This produces non-flat implied-volatility curves and
+model-based deltas.
+
+### Heston Model
+
+Use Heston's stochastic variance process:
+
+```text
+dS_t / S_t = r dt + sqrt(v_t) dW_t^S
+dv_t       = kappa(theta - v_t) dt + xi sqrt(v_t) dW_t^v
+```
+
+with correlation `rho` between the stock and variance shocks. Heston is a
+separate stochastic-volatility model, not just a volatility signal. The model
+should be calibrated across strikes and maturities, then evaluated through the
+same delta-hedging backtester used for the Black-Scholes and Markov approaches.
+
+## Evaluation
+
+Hedging strategies will be evaluated using:
+
+- terminal hedging error;
+- mean absolute hedging error;
+- root mean squared hedging error;
+- 95th and 99th percentile absolute error;
+- hedging-loss Value at Risk and Expected Shortfall;
+- transaction costs;
+- share and notional turnover;
+- performance during high-volatility or regime-transition periods.
+
+Model quality will be evaluated using:
+
+- option pricing error;
+- implied-volatility fit across strikes and maturities;
+- Markov transition-rate and regime-persistence stability;
+- Heston calibration stability;
+- sensitivity to calibration windows, hedge frequency, and transaction costs.
+
+## Current Implementation
+
+The package currently includes reusable infrastructure for:
+
+- European call and put payoff functions;
+- Black-Scholes call and put pricing;
+- Black-Scholes call and put delta calculations;
+- market-data loading, validation, and return calculations;
+- fixed historical and rolling volatility estimators;
+- point-in-time signal construction and leakage checks;
+- signal-based volatility forecasting;
+- discrete-time Black-Scholes delta hedging with transaction costs;
+- repeated option episodes and strategy-level hedging metrics;
+- unit tests for pricing, data, volatility, signals, backtesting, and metrics.
+
+The Markov and Heston lecture notebooks provide the next model implementations
+to promote into the package. The existing signal and rolling-volatility code can
+remain useful as supporting infrastructure, but it should not replace the
+Markov and Heston model comparison.
 
 ## Repository Structure
 
@@ -75,130 +159,35 @@ erdos-volatility-hedging-wu-zhang/
 │   ├── raw/
 │   └── processed/
 ├── docs/
-│   └── research_pipeline.md
 ├── examples/
-│   └── run_synthetic_pipeline.py
 ├── notebooks/
-│   └── 01_end_to_end_demo.ipynb
 ├── results/
 │   ├── figures/
 │   └── tables/
 ├── src/
 │   └── option_hedging/
 │       ├── backtesting/
-│       │   └── episodes.py
 │       ├── data/
-│       │   └── market_data.py
 │       ├── derivatives/
-│       │   └── black_scholes.py
 │       ├── evaluation/
-│       │   └── hedging_metrics.py
 │       ├── models/
-│       │   ├── signal_volatility.py
-│       │   └── volatility.py
 │       ├── signals/
-│       │   ├── base.py
-│       │   ├── definitions.py
-│       │   ├── library.py
-│       │   ├── targets.py
-│       │   ├── transforms.py
-│       │   └── validation.py
 │       └── strategies/
-│           └── delta_hedging.py
 ├── tests/
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
 ```
 
-## Installation
+## Roadmap
 
-```bash
-git clone https://github.com/qzhang2000/erdos-volatility-hedging-wu-zhang.git
-cd erdos-volatility-hedging-wu-zhang
-
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install -e .
-```
-
-On Windows, activate the environment with:
-
-```bash
-.venv\Scripts\activate
-```
-
-## Run the Tests
-
-```bash
-pytest
-```
-
-The completed repository contains tests for:
-
-- Black–Scholes prices, payoffs, and deltas;
-- market-data validation and return calculations;
-- fixed and rolling volatility estimators;
-- signal construction and leakage checks;
-- future realized-volatility alignment;
-- ridge volatility forecasts;
-- discrete-time delta hedging and transaction costs;
-- repeated option episodes and strategy-level metrics.
-
-## Run the End-to-End Demonstration
-
-```bash
-python examples/run_synthetic_pipeline.py
-```
-
-This example generates a reproducible synthetic market, trains the signal model,
-compares three hedging strategies, and writes output tables to `results/tables/`.
-It is a software demonstration, not an empirical project result.
-
-The same workflow is also presented in:
-
-```text
-notebooks/01_end_to_end_demo.ipynb
-```
-
-## Fair Strategy Comparison
-
-Within each option episode, all hedging strategies receive the same initial
-option premium. This separates hedging performance from differences in model
-pricing. The premium is calculated using a designated pricing strategy, while
-each hedge may use its own volatility path for delta calculations.
-
-## Evaluation Metrics
-
-Volatility forecasts are evaluated using:
-
-- mean absolute error;
-- root mean squared error;
-- bias;
-- forecast correlation.
-
-Hedging strategies are evaluated using:
-
-- mean terminal hedging error;
-- mean absolute hedging error;
-- root mean squared hedging error;
-- error standard deviation;
-- 95th and 99th percentile absolute error;
-- hedging-loss Value at Risk and Expected Shortfall;
-- transaction costs;
-- share and notional turnover.
-
-## Remaining Empirical Work
-
-The reusable code is complete enough to run the study. The remaining work is to:
-
-1. choose the underlying asset and historical sample period;
-2. obtain and document adjusted-close and volume data;
-3. optionally add point-in-time external variables such as VIX or interest rates;
-4. select training, validation, and test periods;
-5. tune model hyperparameters using only pre-test data;
-6. run robustness checks across option maturities, rebalancing frequencies, and
-   transaction-cost assumptions;
-7. prepare final figures, executive summary, and presentation.
+- [x] Implement Black-Scholes prices and deltas.
+- [x] Add market-data validation and return utilities.
+- [x] Implement fixed and rolling volatility estimators.
+- [x] Build a delta-hedging backtester with transaction costs.
+- [x] Add strategy-level backtesting and hedging metrics.
+- [ ] Add raw option-chain and underlying market data.
+- [ ] Promote Markov regime-switching pricing and delta code into `src/option_hedging/models/`.
+- [ ] Promote Heston pricing, delta, and calibration code into `src/option_hedging/models/`.
+- [ ] Run chronological out-of-sample hedging comparisons.
+- [ ] Generate final tables, figures, notebook, report, and presentation materials.
