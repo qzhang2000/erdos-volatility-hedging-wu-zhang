@@ -12,7 +12,7 @@ constant-volatility Black-Scholes delta hedge. The main extension is a
 signal-driven hedging strategy that identifies elevated-risk periods and adjusts
 the hedge accordingly.
 
-The lecture notes motivate the volatility models used in the project:
+The modeling stack covers four levels of volatility and risk modeling:
 
 1. **Constant-volatility Black-Scholes:** the benchmark pricing and delta model.
 2. **Finite-state Markov chains:** a discrete low/high volatility state model
@@ -22,9 +22,8 @@ The lecture notes motivate the volatility models used in the project:
 4. **Heston stochastic volatility:** a calibrated stochastic variance model
    that can fit implied-volatility smiles and term structures.
 
-The project is not only a comparison of option-pricing formulas. The central
-question is whether a risk-management rule built from market signals can improve
-hedging outcomes in a chronological backtest.
+The research objective is to determine whether a risk-management rule built
+from market signals can improve hedging outcomes in a chronological backtest.
 
 ## Research Question
 
@@ -46,9 +45,9 @@ episodes, rebalancing calendar, and transaction-cost assumptions.
   volatility model used to generate option prices, implied-volatility curves,
   deltas, or risk states for the hedge.
 
-All final comparisons must be chronological and out of sample. Information
-available after a hedge date, including future returns, later option quotes, or
-future calibration targets, must not be used for that hedge decision.
+All comparisons must be chronological and out of sample. Information available
+after a hedge date, including future returns, later option quotes, or future
+calibration targets, must not be used for that hedge decision.
 
 ## Market Signals
 
@@ -111,8 +110,9 @@ The hedge can react to \(Z_t\) in one or more of the following ways:
 - switch from fixed historical volatility to Markov or Heston model deltas when
   option-implied signals indicate strong volatility-surface stress.
 
-The final project does not need to implement every signal or every adjustment.
-It should implement one clear rule, justify it, and backtest it carefully.
+The initial research implementation should prioritize one clear rule, justify
+the signal choices, and backtest the rule carefully before adding more signals
+or hedge adjustments.
 
 ## Volatility Models
 
@@ -168,13 +168,13 @@ $$
 
 Heston is a stochastic-volatility model, not just a volatility signal. It can be
 calibrated to option prices across strikes and maturities, then used to produce
-model prices, implied volatilities, and deltas. In this project, Heston can be
-implemented as an extension or benchmark for the signal risk-managed hedge.
+model prices, implied volatilities, and deltas. Heston can be implemented as an
+extension or benchmark for the signal risk-managed hedge.
 
 ## Backtesting Experiment
 
-The backtest should answer whether the signal-driven risk rule improves hedging
-after costs.
+The empirical test evaluates whether the signal-driven risk rule improves
+hedging after costs.
 
 1. Choose an underlying asset, sample period, option maturity range, and hedge
    frequency.
@@ -229,10 +229,10 @@ The package currently includes reusable infrastructure for:
 - repeated option episodes and strategy-level hedging metrics;
 - unit tests for pricing, data, volatility, signals, backtesting, and metrics.
 
-The Markov and Heston lecture notebooks provide model implementations to promote
-into the package. The signal and backtesting infrastructure already supports the
-main empirical goal: design a point-in-time risk signal, adjust the hedging rule,
-and test whether the adjustment improves out-of-sample hedge performance.
+Markov and Heston components remain planned package extensions. The signal and
+backtesting infrastructure already supports the core empirical workflow: design
+a point-in-time risk signal, adjust the hedging rule, and test whether the
+adjustment improves out-of-sample hedge performance.
 
 ## Repository Structure
 
