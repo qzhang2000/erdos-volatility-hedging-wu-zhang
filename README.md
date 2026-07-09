@@ -268,8 +268,11 @@ The package currently includes reusable infrastructure for:
 - fixed historical and rolling volatility estimators;
 - point-in-time signal construction and leakage checks;
 - signal-based volatility forecasting;
+- market-signal risk scoring, risk-state classification, and MSA-Delta
+  volatility adjustment;
 - discrete-time Black-Scholes delta hedging with transaction costs;
 - repeated option episodes and strategy-level hedging metrics;
+- synthetic MSA-Delta demonstration notebook;
 - unit tests for pricing, data, volatility, signals, backtesting, and metrics.
 
 Markov and Heston components remain planned package extensions. The signal and
@@ -313,9 +316,10 @@ erdos-volatility-hedging-wu-zhang/
 - [x] Build a delta-hedging backtester with transaction costs.
 - [x] Add point-in-time signal construction and leakage checks.
 - [x] Add strategy-level backtesting and hedging metrics.
+- [x] Build an MSA-Delta risk-state rule using implied volatility and additional market signals.
+- [x] Add a synthetic MSA-Delta backtesting demonstration notebook.
 - [ ] Add real option-chain and underlying market data.
-- [ ] Build a market-signal risk-state rule using implied volatility and at least one additional market signal.
-- [ ] Backtest the MSA-Delta hedge against the FV-BS benchmark.
+- [ ] Backtest the MSA-Delta hedge against the FV-BS benchmark on real market data.
 - [ ] Promote Markov regime-switching pricing and delta code into `src/option_hedging/models/`.
 - [ ] Promote Heston pricing, delta, and calibration code into `src/option_hedging/models/`.
 - [ ] Generate final tables, figures, notebook, report, and presentation materials.
