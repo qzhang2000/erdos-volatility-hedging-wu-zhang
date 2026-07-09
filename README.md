@@ -31,19 +31,26 @@ from market signals can improve hedging outcomes in a chronological backtest.
 > point-in-time market variables, reduce out-of-sample hedging error and tail
 > losses relative to a constant-volatility Black-Scholes delta hedge?
 
-## Project Scope
+## Strategy Definitions
 
 The backtest will compare three hedging approaches under the same option
 episodes, rebalancing calendar, and transaction-cost assumptions.
 
-- **Benchmark hedge:** Black-Scholes delta hedge using one fixed historical
-  volatility estimate.
-- **Signal risk-managed hedge:** Black-Scholes or model-implied delta hedge
-  whose volatility input, hedge frequency, or hedge buffer changes when market
-  signals indicate elevated risk.
-- **Model-based volatility hedge:** a Markov regime-switching or Heston
-  volatility model used to generate option prices, implied-volatility curves,
-  deltas, or risk states for the hedge.
+- **Fixed-Volatility Black-Scholes (FV-BS) Hedge:** baseline delta hedge using
+  one historical volatility estimate fixed at option initiation.
+- **Market-Signal Adjusted Delta (MSA-Delta) Hedge:** Black-Scholes delta hedge
+  whose volatility input and rebalancing rule are conditioned on a point-in-time
+  market risk score. The risk score uses signals such as option-implied
+  volatility, realized-volatility acceleration, volume shocks, and market
+  drawdowns. In elevated-risk states, the hedge can use a higher volatility
+  input, rebalance more frequently, or tighten the no-trade band around the
+  target delta.
+- **Calibrated Volatility-Model Delta (CVM-Delta) Hedge:** hedge whose delta
+  comes from a fitted Markov regime-switching or Heston stochastic-volatility
+  model. The Markov version uses low/high volatility states and transition
+  probabilities or rates. The Heston version uses parameters calibrated to
+  option prices across strikes and maturities. This hedge is model-calibrated
+  rather than directly thresholded on the market-signal risk score.
 
 All comparisons must be chronological and out of sample. Information available
 after a hedge date, including future returns, later option quotes, or future
@@ -68,12 +75,11 @@ The minimum viable strategy should include option-implied volatility plus at
 least one non-option signal such as realized volatility, trading volume,
 interest rates, or sector-market returns.
 
-## Risk-Managed Hedging Design
+## Market-Signal Adjusted Delta Hedge
 
-At each hedge date \(t\), construct a point-in-time feature vector
-\(X_t\). The features are converted into either a volatility forecast
-\(\widehat{\sigma}_{t,h}\), a risk score \(R_t\), or a discrete risk state
-\(Z_t \in \{\text{normal}, \text{elevated}, \text{stress}\}\).
+At each hedge date $t$, construct a point-in-time feature vector $X_t$. The
+features are converted into a risk score $R_t$ and a discrete risk state
+$Z_t \in \{\mathrm{normal}, \mathrm{elevated}, \mathrm{stress}\}$.
 
 One concrete rule is:
 
@@ -97,18 +103,37 @@ Z_t =
 \end{cases}
 $$
 
-where \(q_{70}\) and \(q_{90}\) are thresholds estimated only from the training
+where $q_{70}$ and $q_{90}$ are thresholds estimated only from the training
 period.
 
-The hedge can react to \(Z_t\) in one or more of the following ways:
+The hedge then uses a risk-adjusted volatility input:
 
-- increase the volatility input used in the delta calculation during elevated
-  risk periods;
+$$
+\sigma_t^{\mathrm{hedge}}
+= m(Z_t)\,\widehat{\sigma}_{t}^{\mathrm{base}},
+\qquad
+m(\mathrm{normal}) = 1,\quad
+m(\mathrm{elevated}) > 1,\quad
+m(\mathrm{stress}) > m(\mathrm{elevated}).
+$$
+
+Here $\widehat{\sigma}_{t}^{\mathrm{base}}$ can be a fixed historical estimate,
+a rolling realized-volatility estimate, or an implied-volatility-based estimate.
+The thresholds $q_{70}, q_{90}$ and multipliers $m(Z_t)$ must be selected on
+training or validation data only.
+
+The Black-Scholes delta is computed with $\sigma_t^{\mathrm{hedge}}$:
+
+$$
+\Delta_t^{\mathrm{signal}}
+= \Delta_{\mathrm{BS}}\left(S_t, K, \tau_t, r, \sigma_t^{\mathrm{hedge}}\right).
+$$
+
+The strategy can also react to $Z_t$ through the trading rule:
+
 - rebalance more frequently during elevated-risk or stress periods;
-- widen the hedge buffer only when the expected reduction in hedging error
-  exceeds estimated transaction costs;
-- switch from fixed historical volatility to Markov or Heston model deltas when
-  option-implied signals indicate strong volatility-surface stress.
+- tighten the no-trade band in stress periods when hedge error dominates costs;
+- widen the no-trade band in normal markets to reduce unnecessary turnover.
 
 The initial research implementation should prioritize one clear rule, justify
 the signal choices, and backtest the rule carefully before adding more signals
@@ -152,6 +177,15 @@ by averaging Black-Scholes prices over the occupation-time distribution of the
 high-volatility state. This gives a principled way to connect regime risk to
 option prices, implied-volatility curves, and model deltas.
 
+The corresponding model-based hedge uses the Markov delta:
+
+$$
+\Delta_t^{\mathrm{Markov}}
+= \frac{\partial C_{\mathrm{Markov}}(S_t, K, \tau_t)}{\partial S_t},
+$$
+
+where $C_{\mathrm{Markov}}$ is the regime-switching option price.
+
 ### Heston Model
 
 Use Heston's stochastic variance process:
@@ -168,8 +202,17 @@ $$
 
 Heston is a stochastic-volatility model, not just a volatility signal. It can be
 calibrated to option prices across strikes and maturities, then used to produce
-model prices, implied volatilities, and deltas. Heston can be implemented as an
-extension or benchmark for the signal risk-managed hedge.
+model prices, implied volatilities, and deltas.
+
+The corresponding model-based hedge uses the Heston delta:
+
+$$
+\Delta_t^{\mathrm{Heston}}
+= \frac{\partial C_{\mathrm{Heston}}(S_t, K, \tau_t; \Theta_t)}{\partial S_t},
+$$
+
+where $\Theta_t = (v_0, \kappa, \theta, \xi, \rho)$ is calibrated using only
+option data available at or before hedge date $t$.
 
 ## Backtesting Experiment
 
@@ -183,7 +226,7 @@ hedging after costs.
    that date.
 4. Estimate thresholds, regression weights, Markov transition parameters, or
    Heston calibration settings using only pre-test data.
-5. Run the benchmark and risk-managed hedges on the same option episodes.
+5. Run the FV-BS, MSA-Delta, and CVM-Delta hedges on the same option episodes.
 6. Charge the same transaction-cost model to every strategy.
 7. Compare out-of-sample hedging error, tail losses, turnover, and costs.
 
@@ -271,8 +314,8 @@ erdos-volatility-hedging-wu-zhang/
 - [x] Add point-in-time signal construction and leakage checks.
 - [x] Add strategy-level backtesting and hedging metrics.
 - [ ] Add real option-chain and underlying market data.
-- [ ] Build a risk-state rule using implied volatility and at least one additional market signal.
-- [ ] Backtest the risk-managed hedge against the fixed-volatility benchmark.
+- [ ] Build a market-signal risk-state rule using implied volatility and at least one additional market signal.
+- [ ] Backtest the MSA-Delta hedge against the FV-BS benchmark.
 - [ ] Promote Markov regime-switching pricing and delta code into `src/option_hedging/models/`.
 - [ ] Promote Heston pricing, delta, and calibration code into `src/option_hedging/models/`.
 - [ ] Generate final tables, figures, notebook, report, and presentation materials.
