@@ -85,11 +85,11 @@ One concrete rule is:
 
 $$
 R_t
-= w_1 \operatorname{IVRank}_t
+= w_1 \mathrm{IVRank}_t
 + w_2 \frac{\widehat{\sigma}^{\mathrm{realized}}_{t,21}}
               {\widehat{\sigma}^{\mathrm{realized}}_{t,63}}
-+ w_3 \operatorname{VolumeShock}_t
-+ w_4 \operatorname{MarketDrawdown}_t .
++ w_3 \mathrm{VolumeShock}_t
++ w_4 \mathrm{MarketDrawdown}_t .
 $$
 
 Then define:
@@ -197,7 +197,7 @@ $$
 $$
 dv_t = \kappa(\theta - v_t)\,dt + \xi\sqrt{v_t}\,dW_t^v,
 \qquad
-\operatorname{corr}(dW_t^S, dW_t^v) = \rho .
+\mathrm{corr}(dW_t^S, dW_t^v) = \rho .
 $$
 
 Heston is a stochastic-volatility model, not just a volatility signal. It can be
@@ -273,12 +273,30 @@ The package currently includes reusable infrastructure for:
 - discrete-time Black-Scholes delta hedging with transaction costs;
 - repeated option episodes and strategy-level hedging metrics;
 - synthetic MSA-Delta demonstration notebook;
+- real Yahoo Finance SPY/VIX market-data pipeline, result figures, and
+  real-market MSA-Delta notebook;
 - unit tests for pricing, data, volatility, signals, backtesting, and metrics.
 
 Markov and Heston components remain planned package extensions. The signal and
 backtesting infrastructure already supports the core empirical workflow: design
 a point-in-time risk signal, adjust the hedging rule, and test whether the
 adjustment improves out-of-sample hedge performance.
+
+## Reproducing the Real-Market Backtest
+
+Run the Yahoo Finance pipeline from the repository root:
+
+```bash
+python examples/run_real_market_pipeline.py
+```
+
+The script downloads SPY, VIX, XLK, and 13-week Treasury-bill data; processes
+point-in-time risk signals; fits the MSA-Delta risk-state model on the training
+sample; and backtests FV-BS, Rolling-BS, VIX-BS, and MSA-Delta hedges on the
+test period. It writes generated CSV tables to `results/tables/` and figures to
+`docs/figures/`. The notebook
+`notebooks/03_real_market_msa_delta_backtest.ipynb` presents the reproducible
+run, figures, analysis, and conclusion.
 
 ## Repository Structure
 
@@ -288,10 +306,10 @@ erdos-volatility-hedging-wu-zhang/
 │   ├── raw/
 │   └── processed/
 ├── docs/
+│   └── figures/
 ├── examples/
 ├── notebooks/
 ├── results/
-│   ├── figures/
 │   └── tables/
 ├── src/
 │   └── option_hedging/
@@ -318,8 +336,10 @@ erdos-volatility-hedging-wu-zhang/
 - [x] Add strategy-level backtesting and hedging metrics.
 - [x] Build an MSA-Delta risk-state rule using implied volatility and additional market signals.
 - [x] Add a synthetic MSA-Delta backtesting demonstration notebook.
-- [ ] Add real option-chain and underlying market data.
-- [ ] Backtest the MSA-Delta hedge against the FV-BS benchmark on real market data.
+- [x] Add a real Yahoo Finance market-data pipeline using SPY, VIX, sector, volume, and rate signals.
+- [x] Backtest the MSA-Delta hedge against the FV-BS benchmark on real market data.
+- [x] Add real-market figures, analysis, and conclusion in a notebook.
+- [ ] Add historical option-chain data with implied-volatility skew and term structure.
 - [ ] Promote Markov regime-switching pricing and delta code into `src/option_hedging/models/`.
 - [ ] Promote Heston pricing, delta, and calibration code into `src/option_hedging/models/`.
 - [ ] Generate final tables, figures, notebook, report, and presentation materials.
