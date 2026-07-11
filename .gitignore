@@ -21,11 +21,9 @@ env/
 # Local data and generated results
 data/raw/*
 data/processed/*
-results/figures/*
 results/tables/*
 
 # Preserve empty folders
 !data/raw/.gitkeep
 !data/processed/.gitkeep
-!results/figures/.gitkeep
 !results/tables/.gitkeep
