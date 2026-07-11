@@ -68,6 +68,10 @@ The validated composite MSA rule does not beat the simpler benchmarks on MAE.
 Bootstrap intervals in `results/tables/replication_bootstrap_intervals.csv`
 quantify uncertainty in paired improvements.
 
+See [`docs/detailed_results.md`](docs/detailed_results.md) for the complete
+methodology, metric formulas, all nine maturity–moneyness cells, paired
+bootstrap results, transaction-cost sensitivity, and interpretation limits.
+
 ## Reproduce
 
 ```bash
