@@ -23,6 +23,16 @@ data/raw/*
 data/processed/*
 results/tables/*
 
+# Local presentation sources, presenter notes, and render artifacts
+outputs/market-signal-delta-hedging-5min.pptx
+outputs/market-signal-delta-hedging-5min.pptx.inspect.ndjson
+outputs/market-signal-delta-hedging-5min/
+outputs/market-signal-delta-hedging-beamer.tex
+outputs/market-signal-delta-hedging-beamer-notes.pdf
+outputs/beamer-build/
+outputs/build/
+tmp/
+
 # Preserve empty folders
 !data/raw/.gitkeep
 !data/processed/.gitkeep
