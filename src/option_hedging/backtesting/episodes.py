@@ -19,6 +19,8 @@ class OptionEpisode:
     episode_id: int
     prices: pd.Series
     strike: float
+    maturity_days: int | None = None
+    moneyness: float | None = None
 
     @property
     def start_date(self):
@@ -80,6 +82,45 @@ def generate_option_episodes(
         )
         episode_id += 1
 
+    return episodes
+
+
+def generate_contract_grid(
+    prices: pd.Series,
+    *,
+    maturity_days: Sequence[int] = (10, 21, 42),
+    moneyness: Sequence[float] = (0.95, 1.0, 1.05),
+    start_step: int = 5,
+) -> list[OptionEpisode]:
+    """Create a controlled grid of standardized call contracts.
+
+    These are model-defined European claims evaluated on observed underlying
+    paths.  They are not exchange quotes.  Starts may overlap; callers should
+    use dependence-aware uncertainty estimates.
+    """
+
+    clean = validate_prices(prices, minimum_length=2)
+    episodes: list[OptionEpisode] = []
+    episode_id = 0
+    for maturity in maturity_days:
+        for money in moneyness:
+            generated = generate_option_episodes(
+                clean,
+                maturity_days=maturity,
+                start_step=start_step,
+                moneyness=money,
+            )
+            for episode in generated:
+                episodes.append(
+                    OptionEpisode(
+                        episode_id=episode_id,
+                        prices=episode.prices,
+                        strike=episode.strike,
+                        maturity_days=maturity,
+                        moneyness=money,
+                    )
+                )
+                episode_id += 1
     return episodes
 
 
@@ -167,6 +208,8 @@ def run_strategy_comparison(
                     "initial_spot": episode.initial_spot,
                     "terminal_spot": episode.terminal_spot,
                     "strike": episode.strike,
+                    "maturity_days": episode.maturity_days,
+                    "moneyness": episode.moneyness,
                     "initial_option_price": premium,
                     "option_payoff": result.option_payoff,
                     "hedging_error": result.hedging_error,

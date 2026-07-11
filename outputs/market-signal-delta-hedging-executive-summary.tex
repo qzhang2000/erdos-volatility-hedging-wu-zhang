@@ -1,0 +1,184 @@
+\documentclass[10pt]{article}
+
+\usepackage[letterpaper,margin=0.72in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,array,xcolor,microtype}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{erdosblue}{HTML}{2E74B5}
+\definecolor{lightblue}{HTML}{EAF5FB}
+\definecolor{lightgray}{HTML}{F2F4F7}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\footnotesize Erd\H{o}s Institute Quantitative Finance Project --- Summer 2026}
+\rhead{\footnotesize Yue Wu, Freda Zhang}
+\cfoot{\footnotesize \thepage}
+\setlength{\headheight}{13pt}
+
+\titleformat{\section}{\large\bfseries\color{erdosblue}}{}{0pt}{}
+\titlespacing*{\section}{0pt}{7pt}{3pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3.5pt}
+\setlist[itemize]{leftmargin=1.3em,itemsep=1pt,topsep=2pt}
+
+\newcommand{\formula}[2]{%
+  \colorbox{lightblue}{%
+    \parbox{0.965\linewidth}{\textcolor{erdosblue}{\textbf{#1}}\quad #2}%
+  }%
+}
+
+\begin{document}
+
+{\LARGE\bfseries\color{erdosblue} Executive Summary}\par
+\vspace{2pt}
+{\large\bfseries Market-Signal-Enhanced Delta Hedging on Historical Equity Paths}\par
+\vspace{5pt}
+
+\colorbox{lightgray}{\parbox{0.965\linewidth}{%
+\textbf{Research question.} Can freely available, point-in-time market signals
+improve replication of standardized European-call payoffs relative to
+fixed-volatility Black--Scholes hedging?}}
+
+\section{Objective and scope}
+
+We test whether information beyond historical SPY prices improves dynamic
+hedging. The experiment uses observed SPY, VIX, volume, sector-return, and
+short-rate data, while defining standardized European calls instead of claiming
+access to historical option quotes. It therefore measures payoff replication on
+realized market paths, not historical bid--ask execution, early exercise, or
+contract-level volatility-surface fit. The option claim, premium convention,
+rebalancing calendar, and transaction-cost model are identical across
+strategies.
+
+\section{Mathematical framework}
+
+For a call with spot $S_t$, strike $K$, time to maturity $\tau$, risk-free rate
+$r$, and hedge volatility $\sigma_t$, every strategy holds the Black--Scholes
+delta
+
+\formula{Black--Scholes delta}{%
+$\displaystyle \Delta_t=N(d_{1,t}),\qquad
+d_{1,t}=\frac{\log(S_t/K)+(r+\tfrac12\sigma_t^2)\tau}
+{\sigma_t\sqrt{\tau}}.$}
+
+The strategies differ only in the volatility supplied to this common engine:
+
+\begin{itemize}
+  \item \textbf{FV-BS:} trailing 21-day realized volatility observed at
+  initiation and then held fixed;
+  \item \textbf{Rolling-BS:} trailing 21-day realized volatility updated on
+  every hedge date;
+  \item \textbf{VIX-BS:} contemporaneous VIX, used as a freely available
+  option-market volatility proxy; and
+  \item \textbf{MSA-Delta:} $\sigma_t^{\mathrm{MSA}}=m(Z_t)\widehat\sigma_t$,
+  where $\widehat\sigma_t$ is rolling realized volatility and $m(Z_t)$ depends
+  on a market-risk state.
+\end{itemize}
+
+After standardizing all features with development-period means and standard
+deviations, MSA-Delta uses
+
+\formula{Risk score}{%
+$\displaystyle R_t=0.30\,\mathrm{IVRank}_t+0.20\,\mathrm{VIX}_t
++0.20\frac{\mathrm{RV}_{21,t}}{\mathrm{RV}_{63,t}}
++0.10\,\mathrm{VolumeShock}_t+0.10\,\mathrm{Drawdown}_{63,t}
++0.05\,\mathrm{SectorDiv}_t+0.05\lvert\Delta\mathrm{Rate}_{21,t}\rvert.$}
+
+Training-score quantiles determine the state and multiplier:
+
+\formula{Risk-state rule}{%
+$\displaystyle
+Z_t=\begin{cases}
+\mathrm{normal},&R_t<q_{70},\\
+\mathrm{elevated},&q_{70}\le R_t<q_{90},\\
+\mathrm{stress},&R_t\ge q_{90},
+\end{cases}\qquad
+m(Z_t)\in\{1.00,1.15,1.40\}.$}
+
+\section{Empirical method}
+
+The split is strictly chronological. Training (April 2016--August 2020)
+estimates feature scaling and risk thresholds. Validation (August 2020--May
+2022) selects among three predeclared MSA configurations using mean absolute
+hedging error (MAE). The selected moderate rule is refit on training plus
+validation data, and the held-out test (May 2022--December 2024) is evaluated
+once. Every feature at date $t$ uses information available at or before $t$.
+
+The test grid crosses maturities of 10, 21, and 42 trading days with strike/spot
+ratios of 0.95, 1.00, and 1.05. Episodes begin every five trading days, yielding
+1,149 claims per strategy. Hedges rebalance daily and pay 5 basis points of
+proportional costs. Each strategy receives the same FV-BS premium within an
+episode. Terminal replication error is
+
+\formula{Terminal error}{%
+$\displaystyle E_T=V_T-\max(S_T-K,0),$ where $V_T$ is the hedge portfolio after
+stock liquidation and transaction costs.}
+
+We report MAE, root mean squared error (RMSE), loss Expected Shortfall (ES),
+turnover, and moving date-block bootstrap confidence intervals for paired MAE
+improvements. Overlapping starts expand coverage; block resampling addresses
+their time dependence.
+
+\section{Held-out results}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.13}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Strategy} & \textbf{MAE} & \textbf{RMSE} & \textbf{95\% loss ES}
+& \textbf{Avg. cost} \\
+\midrule
+FV-BS      & \textbf{1.5523} & 2.5422 & 6.7463 & 0.4631 \\
+Rolling-BS & 1.6074 & 2.4385 & 6.4496 & 0.4690 \\
+VIX-BS     & 1.6956 & \textbf{2.3993} & \textbf{5.5171} & \textbf{0.4580} \\
+MSA-Delta  & 1.6906 & 2.5368 & 6.5819 & 0.4662 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+FV-BS has the lowest MAE, so the test does not support a blanket claim that
+additional signals improve average hedging accuracy. VIX-BS has the lowest
+RMSE, 95\% loss ES, average cost, and turnover. The difference is economically
+meaningful: forward-looking volatility reduces some large replication errors
+even though it is less accurate under the average absolute-error criterion.
+
+\section{Uncertainty and robustness}
+
+Define paired improvement as
+$I=\lvert E_{\mathrm{FV}}\rvert-\lvert E_{\mathrm{strategy}}\rvert$, so
+$I>0$ favors the alternative. Moving-block bootstrap estimates are $-0.138$
+for MSA-Delta (95\% CI $[-0.254,-0.039]$), $-0.057$ for Rolling-BS
+($[-0.119,0.006]$), and $-0.148$ for VIX-BS ($[-0.255,-0.033]$). Thus neither
+VIX-BS nor MSA-Delta improves MAE relative to FV-BS with statistical support.
+The central ranking also survives transaction-cost assumptions of 0, 5, and 10
+basis points: FV-BS retains the lowest MAE and VIX-BS the lowest RMSE. Results
+are additionally reported for all nine maturity--moneyness combinations.
+
+\section{Conclusion and limitations}
+
+\colorbox{lightblue}{\parbox{0.965\linewidth}{%
+\textbf{Main finding.} Forward-looking option-market information improves
+tail-risk control, but additional composite-signal complexity does not
+automatically produce a better hedge.}}
+
+Fixed realized volatility is best for minimizing average absolute replication
+error in this sample. VIX is the strongest simple benchmark for squared error
+and adverse-tail performance. The validation-selected MSA rule does not add
+robust value beyond the simpler alternatives. This negative result is useful:
+signal complexity must be validated out of sample rather than justified only by
+economic intuition.
+
+VIX is an index-level, approximately 30-day volatility measure rather than
+contract-level SPY implied volatility. The controlled European claims omit
+historical option spreads, dividends, American early exercise, and
+volatility-surface effects. Block-bootstrap inference mitigates, but does not
+eliminate, dependence among overlapping episodes. The natural extension is to
+repeat the same leakage-controlled experiment using historical contract-level
+option quotes when licensed data become available.
+
+\end{document}

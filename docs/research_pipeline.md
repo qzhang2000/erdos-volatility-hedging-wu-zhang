@@ -1,39 +1,32 @@
 # Research Pipeline
 
-The repository now implements the full computational path needed for the
-empirical project:
+## Estimand
 
-1. Validate adjusted-close and volume data.
-2. Construct leakage-safe market signals.
-3. Construct future realized-volatility labels.
-4. Split observations chronologically.
-5. Fit a positive ridge volatility forecaster.
-6. Produce fixed, rolling Gaussian, and signal-based volatility inputs.
-7. Generate repeated European-call episodes.
-8. Apply the same Black-Scholes delta-hedging engine to every strategy.
-9. Compare forecast accuracy, hedging error, tail loss, turnover, and costs.
+The primary outcome is paired reduction in absolute terminal replication error
+relative to FV-BS. Positive improvement means a strategy produced a smaller
+absolute error on the same standardized claim and underlying path.
 
-## Fair comparison convention
+## Data and timing
 
-Every strategy receives the same option premium within an episode. The premium
-is calculated from the strategy selected as `pricing_strategy`. This prevents a
-strategy from appearing to hedge better merely because it sold the option at a
-different model price.
+Daily SPY, VIX, XLK, and 13-week Treasury-bill observations are normalized into
+`data/processed/public_market_daily.csv`. Its companion JSON records source,
+coverage, split dates, selected validation configuration, and SHA-256 digest.
+Every feature at date `t` uses observations dated at or before `t`.
 
-## Leakage convention
+## Chronological workflow
 
-Signals at date `t` use only observations dated at or before `t`. Future
-realized volatility is a training label and is never included among the input
-features. Model evaluation uses chronological train/test splits.
+1. Fit feature scaling and score thresholds on training observations.
+2. Evaluate three predeclared risk-state configurations on validation data.
+3. Select the lowest validation MAE, breaking ties with RMSE.
+4. Refit that configuration on training plus validation observations.
+5. Generate the test contract grid without inspecting test outcomes.
+6. Run all strategies with identical claims, premiums, calendars, and costs.
+7. Report aggregate and maturity/moneyness-specific results.
+8. Use paired moving date-block bootstrap intervals for overlapping episodes.
 
-## Remaining empirical work
+## Interpretation boundary
 
-The code is complete enough to run once real data are supplied. The remaining
-project work is empirical rather than structural:
-
-- choose the underlying and sample period;
-- obtain and document the data source;
-- select interest-rate and optional external risk signals;
-- tune windows and ridge penalty using training/validation data only;
-- run robustness checks and interpret results;
-- prepare final figures, executive summary, and presentation.
+The experiment evaluates replication of model-defined European payoffs on
+historical market paths. It is not an exchange-option backtest. Consequently,
+historical option pricing error, bid-ask execution, early exercise, and
+contract-specific volatility-surface fit are outside the estimand.

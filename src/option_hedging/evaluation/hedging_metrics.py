@@ -103,3 +103,64 @@ def volatility_forecast_metrics(
         },
         name="volatility_forecast_metrics",
     )
+
+
+def paired_block_bootstrap(
+    results: pd.DataFrame,
+    *,
+    baseline: str = "FV-BS",
+    block_days: int = 21,
+    n_bootstrap: int = 2000,
+    seed: int = 2026,
+) -> pd.DataFrame:
+    """Estimate paired MAE improvements with a moving date-block bootstrap.
+
+    Improvement is ``|baseline error| - |strategy error|``; positive values
+    favor the strategy. Sampling contiguous start-date blocks preserves much
+    of the dependence induced by overlapping option episodes.
+    """
+
+    required = {"strategy", "start_date", "maturity_days", "moneyness", "hedging_error"}
+    missing = sorted(required.difference(results.columns))
+    if missing:
+        raise KeyError(f"results is missing required columns: {', '.join(missing)}")
+    if block_days < 1 or n_bootstrap < 1:
+        raise ValueError("block_days and n_bootstrap must be positive.")
+
+    keyed = results.copy()
+    keyed["start_date"] = pd.to_datetime(keyed["start_date"])
+    pivot = keyed.pivot_table(
+        index=["start_date", "maturity_days", "moneyness"],
+        columns="strategy",
+        values="hedging_error",
+        aggfunc="first",
+    ).dropna()
+    if baseline not in pivot.columns:
+        raise KeyError(f"baseline strategy {baseline!r} is unavailable.")
+
+    dates = pd.Index(sorted(pivot.index.get_level_values("start_date").unique()))
+    if len(dates) < 2:
+        raise ValueError("at least two episode start dates are required.")
+    rng = np.random.default_rng(seed)
+    rows: list[dict[str, float | str]] = []
+    for strategy in sorted(set(pivot.columns).difference({baseline})):
+        paired = pivot[[baseline, strategy]].dropna()
+        improvement = paired[baseline].abs() - paired[strategy].abs()
+        date_improvement = improvement.groupby(level="start_date").mean().reindex(dates)
+        values = date_improvement.to_numpy(dtype=float)
+        observed = float(np.nanmean(values))
+        draws = np.empty(n_bootstrap)
+        for draw in range(n_bootstrap):
+            starts = rng.integers(0, len(values), size=int(np.ceil(len(values) / block_days)))
+            positions = np.concatenate([
+                (start + np.arange(block_days)) % len(values) for start in starts
+            ])[: len(values)]
+            draws[draw] = float(np.nanmean(values[positions]))
+        rows.append({
+            "strategy": strategy,
+            "mean_mae_improvement": observed,
+            "ci_2_5": float(np.quantile(draws, 0.025)),
+            "ci_97_5": float(np.quantile(draws, 0.975)),
+            "probability_improvement": float(np.mean(draws > 0.0)),
+        })
+    return pd.DataFrame(rows).set_index("strategy")
